@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL语句生成器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        .container {
+            flex: 1;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f4f4f9;
+            box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        h2, h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        h3 {
+            margin-top: 20px;
+        }
+        .input-group {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            margin-right: 5px;
+            color: #555;
+            white-space: nowrap;
+        }
+        input[type="text"], select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            flex: 1;
+        }
+        button {
+            padding: 5px 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+            margin-top: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .output-container {
+            position: relative;
+            margin-top: 15px;
+        }
+        .output {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #fff;
+            white-space: pre-wrap;
+            height: 120px;
+            overflow-y: auto;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            padding: 5px 10px;
+            background-color: #28a745;
+            color: white;
+            font-size: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background-color: #218838;
+        }
+        .statement-container {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>SQL语句生成-创建数据表</h2>
+        <div class="input-group">
+            <label for="createTableName">表名：</label>
+            <input type="text" id="createTableName" placeholder="请输入表名">
+        </div>
+
+        <div id="createColumnsContainer">
+            <h3>列信息</h3>
+            <div class="column-inputs input-group">
+                <label>列名：</label>
+                <input type="text" class="colName" placeholder="列名">
+                <label>数据类型：</label>
+                <select class="colType">
+                    <option value="INT">INT</option>
+                    <option value="VARCHAR(255)">VARCHAR(255)</option>
+                    <option value="TEXT">TEXT</option>
+                    <option value="DATE">DATE</option>
+                    <option value="DATETIME">DATETIME</option>
+                    <option value="FLOAT">FLOAT</option>
+                    <option value="DOUBLE">DOUBLE</option>
+                    <option value="BOOLEAN">BOOLEAN</option>
+                </select>
+                <label>允许为空</label>
+                <input type="checkbox" class="colNull">
+                <label>主键</label>
+                <input type="checkbox" class="colPrimaryKey">
+            </div>
+        </div>
+
+        <button onclick="addColumn()">添加列</button>
+        <br/>
+        <button onclick="generateCreateSQL()">生成【创建数据表】语句</button>
+
+        <div class="output-container">
+            <div class="output" id="createSQLOutput"></div>
+            <button class="copy-btn" onclick="copyToClipboard('createSQLOutput')">复制SQL语句</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>SQL语句生成-插入数据</h2>
+        <div class="input-group">
+            <label for="insertTableName">表名：</label>
+            <input type="text" id="insertTableName" placeholder="请输入表名">
+        </div>
+
+        <div id="insertColumnsContainer">
+            <h3>列信息</h3>
+            <div class="input-group">
+                <label>列名：</label>
+                <input type="text" class="insertColName" placeholder="列名">
+            </div>
+        </div>
+
+        <button onclick="addInsertColumn()">添加列</button>
+        <br/>
+        <button onclick="quickFillFromCreate()">快速填充</button>
+        <br/>
+        <button onclick="addStatement()">新增语句</button>
+        <br/>
+        <button onclick="generateInsertSQL()">生成所有【插入数据】语句</button>
+
+        <div id="statementsContainer">
+            <!-- Insert Statement Blocks will appear here -->
+        </div>
+        
+        <div class="output-container">
+            <div class="output" id="insertSQLOutputs"></div>
+            <button class="copy-btn" onclick="copyToClipboard('insertSQLOutputs')">复制SQL语句</button>
+        </div>
+    </div>
+
+    <script>
+        let statementCount = 0;
+        let insertColumns = [];
+
+        function addColumn() {
+            const container = document.getElementById('createColumnsContainer');
+            const columnInputs = document.createElement('div');
+            columnInputs.classList.add('column-inputs', 'input-group');
+            columnInputs.innerHTML = `
+                <label>列名：</label>
+                <input type="text" class="colName" placeholder="列名">
+                <label>数据类型：</label>
+                <select class="colType">
+                    <option value="INT">INT</option>
+                    <option value="VARCHAR(255)">VARCHAR(255)</option>
+                    <option value="TEXT">TEXT</option>
+                    <option value="DATE">DATE</option>
+                    <option value="DATETIME">DATETIME</option>
+                    <option value="FLOAT">FLOAT</option>
+                    <option value="DOUBLE">DOUBLE</option>
+                    <option value="BOOLEAN">BOOLEAN</option>
+                </select>
+                <label>允许为空</label>
+                <input type="checkbox" class="colNull">
+                <label>主键</label>
+                <input type="checkbox" class="colPrimaryKey">
+            `;
+            container.appendChild(columnInputs);
+        }
+
+        function generateCreateSQL() {
+            const tableName = document.getElementById('createTableName').value.trim();
+            if (!tableName) {
+                alert('请输入表名。');
+                return;
+            }
+
+            const columnInputs = document.querySelectorAll('#createColumnsContainer .column-inputs');
+            let columnsSQL = [];
+            let primaryKeys = [];
+
+            columnInputs.forEach(inputGroup => {
+                const colName = inputGroup.querySelector('.colName').value.trim();
+                const colType = inputGroup.querySelector('.colType').value;
+                const allowNull = inputGroup.querySelector('.colNull').checked;
+                const isPrimaryKey = inputGroup.querySelector('.colPrimaryKey').checked;
+
+                if (!colName) {
+                    alert('请填写所有列的信息。');
+                    return;
+                }
+
+                let columnSQL = `${colName} ${colType}`;
+                columnSQL += allowNull ? ' NULL' : ' NOT NULL';
+
+                columnsSQL.push(columnSQL);
+
+                if (isPrimaryKey) {
+                    primaryKeys.push(colName);
+                }
+            });
+
+            if (columnsSQL.length === 0) {
+                alert('请至少添加一个列。');
+                return;
+            }
+
+            let sql = `CREATE TABLE ${tableName} (\n  ${columnsSQL.join(',\n  ')}`;
+            if (primaryKeys.length > 0) {
+                sql += `,\n  PRIMARY KEY (${primaryKeys.join(', ')})`;
+            }
+            sql += '\n);';
+
+            document.getElementById('createSQLOutput').textContent = sql;
+        }
+
+        function addInsertColumn() {
+            const container = document.getElementById('insertColumnsContainer');
+            const columnInputs = document.createElement('div');
+            columnInputs.classList.add('column-inputs', 'input-group');
+            columnInputs.innerHTML = `
+                <label>列名：</label>
+                <input type="text" class="insertColName" placeholder="列名">
+            `;
+            container.appendChild(columnInputs);
+        }
+
+        function quickFillFromCreate() {
+            const createTableName = document.getElementById('createTableName').value.trim();
+            const createColumnInputs = document.querySelectorAll('#createColumnsContainer .colName');
+
+            if (!createTableName) {
+                alert('请先在创建表部分输入表名。');
+                return;
+            }
+
+            document.getElementById('insertTableName').value = createTableName;
+
+            const insertContainer = document.getElementById('insertColumnsContainer');
+            insertContainer.innerHTML = '<h3>列信息</h3>'; // 清空并保留标题
+
+            createColumnInputs.forEach(colInput => {
+                const colName = colInput.value.trim();
+                if (colName) {
+                    const columnInputs = document.createElement('div');
+                    columnInputs.classList.add('column-inputs', 'input-group');
+                    columnInputs.innerHTML = `
+                        <label>列名：</label>
+                        <input type="text" class="insertColName" value="${colName}" placeholder="列名">
+                    `;
+                    insertContainer.appendChild(columnInputs);
+                }
+            });
+        }
+
+        function addStatement() {
+            const insertColNames = document.querySelectorAll('#insertColumnsContainer .insertColName');
+            insertColumns = [];
+            insertColNames.forEach(input => {
+                const colName = input.value.trim();
+                if (colName) {
+                    insertColumns.push(colName);
+                }
+            });
+
+            if (insertColumns.length === 0) {
+                alert('请先添加表的列名。');
+                return;
+            }
+
+            statementCount++;
+            const statementsContainer = document.getElementById('statementsContainer');
+            const statementBlock = document.createElement('div');
+            statementBlock.classList.add('statement-container');
+            statementBlock.innerHTML = `
+                <h3>语句 ${statementCount}</h3>
+                <div id="insertDataContainer${statementCount}">
+                    <h4>值信息</h4>
+                    ${insertColumns.map(colName =>
+                        `<div class="input-group">
+                            <label>${colName}：</label>
+                            <input type="text" class="dataValue" placeholder="值">
+                        </div>`
+                    ).join('')}
+                </div>
+            `;
+            statementsContainer.appendChild(statementBlock);
+        }
+
+        function generateInsertSQL() {
+            const tableName = document.getElementById('insertTableName').value.trim();
+            if (!tableName) {
+                alert('请输入表名。');
+                return;
+            }
+
+            const insertStatements = [];
+            for (let i = 1; i <= statementCount; i++) {
+                const dataInputs = document.querySelectorAll(`#insertDataContainer${i} .dataValue`);
+                let values = [];
+
+                dataInputs.forEach(input => {
+                    const value = input.value.trim();
+                    values.push(`'${value}'`); // 假设输入的都是字符串类型，实际应用中需根据数据类型处理。
+                });
+
+                let sql = `INSERT INTO ${tableName} (${insertColumns.join(', ')}) VALUES (${values.join(', ')});`;
+                insertStatements.push(sql);
+            }
+
+            document.getElementById('insertSQLOutputs').textContent = insertStatements.join('\n\n');
+        }
+
+        function copyToClipboard(elementId) {
+            const outputElement = document.getElementById(elementId);
+            const text = outputElement.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('SQL语句已复制到剪贴板!');
+            }, err => {
+                alert('复制失败，请手动复制文本。');
+            });
+        }
+    </script>
+
+</body>
+</html>
